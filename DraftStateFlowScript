@@ -1,0 +1,63 @@
+using Stylelabs.M.Sdk;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using static Stylelabs.M.Sdk.Constants.UserGroup;
+
+private const string MAssetToActiveState = "MAssetToActiveState";
+
+MClient.Logger.Info("ScriptTest - started");
+
+var asset = await GetContextEntity();
+
+if (asset == null)
+{
+    MClient.Logger.Info("Asset is null");
+    return;
+}
+
+var MAssetToActiveStateRelation = asset.GetRelation<IParentToManyChildrenRelation>(MAssetToActiveState);
+
+if (MAssetToActiveStateRelation != null && MAssetToActiveStateRelation.Children != null && MAssetToActiveStateRelation.Children.Count > 0)
+{
+    MAssetToActiveStateRelation.Clear();
+
+    IList<long> newActiveStateValues = new List<long>();
+
+    //put draft state flow id from M.Automation.State taxonomy
+    newActiveStateValues.Add(draftstateflowid);
+    MAssetToActiveStateRelation.SetIds(newActiveStateValues);
+    
+    MClient.Entities.SaveAsync(asset).ConfigureAwait(false);
+}
+
+MClient.Logger.Info($"Finished");
+
+private async Task<IEntity> GetContextEntity()
+{
+    var entityLoadConfiguration = new EntityLoadConfiguration
+    {
+        PropertyLoadOption = PropertyLoadOption.None,
+        RelationLoadOption = new RelationLoadOption(MAssetToActiveState),
+        CultureLoadOption = CultureLoadOption.Default
+    };
+
+    var entity = Context.Target as IEntity;
+    if (entity == null)
+    {
+        if (Context.TargetId.HasValue)
+        {
+            entity = await MClient.Entities.GetAsync(Context.TargetId.Value, entityLoadConfiguration).ConfigureAwait(false);
+        }
+        if (entity?.Id == null)
+        {
+            MClient.Logger.Info($"Could not find context entity.");
+            return null;
+        }
+    }
+    else
+        await entity.LoadMembersAsync(entityLoadConfiguration.PropertyLoadOption, entityLoadConfiguration.RelationLoadOption).ConfigureAwait(false);
+    return entity;
+}

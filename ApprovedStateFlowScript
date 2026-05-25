@@ -1,0 +1,87 @@
+using Stylelabs.M.Sdk;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using static Stylelabs.M.Sdk.Constants.UserGroup;
+
+private const string MAssetToActiveState = "MAssetToActiveState";
+private const string MAssetToAvailableRoute = "MAssetToAvailableRoute";
+
+MClient.Logger.Info("Approved State Flow Script - started");
+
+var asset = await GetContextEntity();
+
+if (asset == null)
+{
+    MClient.Logger.Info("Asset is null");
+    return;
+}
+
+var MAssetToActiveStateRelation = asset.GetRelation<IParentToManyChildrenRelation>(MAssetToActiveState);
+
+if (MAssetToActiveStateRelation != null)
+{
+    foreach (var item in MAssetToActiveStateRelation.Children)
+    {
+        MClient.Logger.Info($"current values: " + item);
+    }
+    MAssetToActiveStateRelation.Clear();
+    MClient.Logger.Info("relation is cleared");
+
+    IList<long> newActiveStateValues = new List<long>();
+
+    //M.Automation.State Approved state id
+    newActiveStateValues.Add(39163);
+    MAssetToActiveStateRelation.SetIds(newActiveStateValues);
+    MClient.Logger.Info("relation is added");
+
+    foreach (var item in MAssetToActiveStateRelation.Children)
+    {
+        MClient.Logger.Info($"added values: " + item);
+    }
+
+    var MAssetToAvailableRouteRelation = asset.GetRelation<IParentToManyChildrenRelation>(MAssetToAvailableRoute);
+    if (MAssetToAvailableRouteRelation != null)
+    {
+        foreach (var item in MAssetToAvailableRouteRelation.Children)
+        {
+            MClient.Logger.Info($"MAssetToAvailableRouteRelation current values: " + item);
+        }
+
+        MAssetToAvailableRouteRelation.Clear();
+        MClient.Logger.Info("MAssetToAvailableRouteRelation is cleared");
+    }
+    
+    MClient.Entities.SaveAsync(asset).ConfigureAwait(false);
+}
+
+MClient.Logger.Info($"Approved State Flow Script - Finished");
+
+private async Task<IEntity> GetContextEntity()
+{
+    var entityLoadConfiguration = new EntityLoadConfiguration
+    {
+        PropertyLoadOption = PropertyLoadOption.None,
+        RelationLoadOption = new RelationLoadOption(MAssetToActiveState, MAssetToAvailableRoute),
+        CultureLoadOption = CultureLoadOption.Default
+    };
+
+    var entity = Context.Target as IEntity;
+    if (entity == null)
+    {
+        if (Context.TargetId.HasValue)
+        {
+            entity = await MClient.Entities.GetAsync(Context.TargetId.Value, entityLoadConfiguration).ConfigureAwait(false);
+        }
+        if (entity?.Id == null)
+        {
+            MClient.Logger.Info($"Could not find context entity.");
+            return null;
+        }
+    }
+    else
+        await entity.LoadMembersAsync(entityLoadConfiguration.PropertyLoadOption, entityLoadConfiguration.RelationLoadOption).ConfigureAwait(false);
+    return entity;
+}
